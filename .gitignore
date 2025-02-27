@@ -62,3 +62,5 @@ Dockerfile*
 
 # Windows system files (if you're using Windows)
 Thumbs.db
+
+.database/
