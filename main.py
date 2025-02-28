@@ -1,6 +1,7 @@
 # main.py
 from fastapi import FastAPI
 import crud
+import database
 from database import SessionLocal, Base, engine
 from models import models
 
@@ -12,7 +13,7 @@ Base.metadata.create_all(bind=engine)
 def read_root():
     return {"message": "Hello, World!"}
 
-@app.get("/climber/create-test")
+@app.get("/test/climber/create-test")
 def create_test_climber():
     crud.create_climber(
         db=SessionLocal(),
@@ -29,3 +30,7 @@ def create_test_climber():
     )
 
     return {"message": "Test climber created"}
+
+@app.get("/test/load-exemple-data")
+def load_example_data():
+    database.extract_example_data_to_db()

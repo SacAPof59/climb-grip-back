@@ -59,3 +59,17 @@ class MeasuredData(Base):
     measurement_id = Column(Integer, ForeignKey("measurement.id"), primary_key=True, index=True)
     iteration = Column(Integer, primary_key=True)
     weight = Column(Float, primary_key=True)
+
+class CriticalForceWorkout(Base):
+    __tablename__ = "critical_force_workout"
+
+    workout_id = Column(Integer, ForeignKey("workout.id"), primary_key=True, index=True)
+    critical_force = Column(Float)
+    w_prime = Column(Float)
+    max_force = Column(Float)
+
+class MaxIsoStrengthWorkout(Base):
+    __tablename__ = "max_iso_strength_workout"
+
+    workout_id = Column(Integer, ForeignKey("workout.id"), primary_key=True, index=True)
+    max_force = Column(Float)
