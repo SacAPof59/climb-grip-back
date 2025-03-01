@@ -1,36 +1,19 @@
 # main.py
+import os
+
 from fastapi import FastAPI
-import crud
-import database
-from database import SessionLocal, Base, engine
-from models import models
+from starlette.staticfiles import StaticFiles
+
+from webapi import webapi
+from temp_ui import temp_ui
+from database.database import Base, engine
 
 app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello, World!"}
-
-@app.get("/test/climber/create-test")
-def create_test_climber():
-    crud.create_climber(
-        db=SessionLocal(),
-        climber=models.Climber(
-            first_name="Test",
-            last_name="Climber",
-            age=30,
-            gender="M",
-            height=180,
-            span=180,
-            route_grade="7a",
-            boulder_grade="7a"
-        )
-    )
-
-    return {"message": "Test climber created"}
-
-@app.get("/test/load-exemple-data")
-def load_example_data():
-    database.extract_example_data_to_db()
+# Mount static files directory
+if os.path.exists("temp_ui/static"):
+    app.mount("/static", StaticFiles(directory="temp_ui/static"), name="static")
+app.mount("/api/v1", webapi.api_v1)
+app.mount("/", temp_ui.ui)
