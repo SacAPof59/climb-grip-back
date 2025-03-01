@@ -2,20 +2,13 @@ import json
 import os
 from datetime import datetime
 
-import numpy as np
 from fastapi import HTTPException
-from sqlalchemy import create_engine, func
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import func
 
-import crud
-from compute import criticalForce
+from database import crud
+from database.database import SessionLocal
 from models import models
 
-DATABASE_URL = "sqlite:///./.database/data.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
 def extract_example_data_to_db():
     exemple_data_list = _load_exemple_data()
@@ -25,7 +18,7 @@ def extract_example_data_to_db():
 
 
 def _load_exemple_data():
-    data_dir = "data"
+    data_dir = "../data"
     if not os.path.exists(data_dir):
         raise HTTPException(status_code=404, detail=f"Data directory '{data_dir}' not found")
 
