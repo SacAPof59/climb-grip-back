@@ -3,11 +3,11 @@ from sqlalchemy.orm import relationship
 from database.database import Base
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 
 # SQLAlchemy Models (Database)
-class Climber(Base):
+class ClimberEntity(Base):
     __tablename__ = "climber"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -20,18 +20,18 @@ class Climber(Base):
     route_grade = Column(String)
     boulder_grade = Column(String)
 
-    workouts = relationship("Workout", back_populates="climber")
+    workouts = relationship("WorkoutEntity", back_populates="climber")
 
 
-class MeasurementDevice(Base):
+class MeasurementDeviceEntity(Base):
     __tablename__ = "measurement_device"
 
     id = Column(Integer, primary_key=True, index=True)
     sample_rate_hz = Column(Integer)
-    measurements = relationship("Measurement", back_populates="measurement_device")
+    measurements = relationship("MeasurementEntity", back_populates="measurement_device")
 
 
-class WorkoutType(Base):
+class WorkoutTypeEntity(Base):
     __tablename__ = "workout_type"
 
     name = Column(String, primary_key=True, index=True)
@@ -41,10 +41,10 @@ class WorkoutType(Base):
     repetitions = Column(Integer)
     repetition_active = Column(Integer)
     repetition_pause = Column(Integer)
-    workouts = relationship("Workout", back_populates="workout_type")
+    workouts = relationship("WorkoutEntity", back_populates="workout_type")
 
 
-class Workout(Base):
+class WorkoutEntity(Base):
     __tablename__ = "workout"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -54,14 +54,14 @@ class Workout(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
-    climber = relationship("Climber", back_populates="workouts")
-    workout_type = relationship("WorkoutType", back_populates="workouts")
-    measurements = relationship("Measurement", back_populates="workout")
-    critical_force_workouts = relationship("CriticalForceWorkout", back_populates="workout")
-    max_iso_strength_workouts = relationship("MaxIsoStrengthWorkout", back_populates="workout")
+    climber = relationship("ClimberEntity", back_populates="workouts")
+    workout_type = relationship("WorkoutTypeEntity", back_populates="workouts")
+    measurements = relationship("MeasurementEntity", back_populates="workout")
+    critical_force_workouts = relationship("CriticalForceWorkoutEntity", back_populates="workout")
+    max_iso_strength_workouts = relationship("MaxIsoStrengthWorkoutEntity", back_populates="workout")
 
 
-class Measurement(Base):
+class MeasurementEntity(Base):
     __tablename__ = "measurement"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -71,36 +71,36 @@ class Measurement(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
-    workout = relationship("Workout", back_populates="measurements")
-    measurement_device = relationship("MeasurementDevice", back_populates="measurements")
-    measured_data = relationship("MeasuredData", back_populates="measurement")
+    workout = relationship("WorkoutEntity", back_populates="measurements")
+    measurement_device = relationship("MeasurementDeviceEntity", back_populates="measurements")
+    measured_data = relationship("MeasuredDataEntity", back_populates="measurement")
 
 
-class MeasuredData(Base):
+class MeasuredDataEntity(Base):
     __tablename__ = "measured_data"
 
     measurement_id = Column(Integer, ForeignKey("measurement.id"), primary_key=True, index=True)
     iteration = Column(Integer, primary_key=True)
     weight = Column(Float)
-    measurement = relationship("Measurement", back_populates="measured_data")
+    measurement = relationship("MeasurementEntity", back_populates="measured_data")
 
 
-class CriticalForceWorkout(Base):
+class CriticalForceWorkoutEntity(Base):
     __tablename__ = "critical_force_workout"
 
     workout_id = Column(Integer, ForeignKey("workout.id"), primary_key=True, index=True)
     critical_force = Column(Float)
     w_prime = Column(Float)
     max_force = Column(Float)
-    workout = relationship("Workout", back_populates="critical_force_workouts")
+    workout = relationship("WorkoutEntity", back_populates="critical_force_workouts")
 
 
-class MaxIsoStrengthWorkout(Base):
+class MaxIsoStrengthWorkoutEntity(Base):
     __tablename__ = "max_iso_strength_workout"
 
     workout_id = Column(Integer, ForeignKey("workout.id"), primary_key=True, index=True)
     max_force = Column(Float)
-    workout = relationship("Workout", back_populates="max_iso_strength_workouts")
+    workout = relationship("WorkoutEntity", back_populates="max_iso_strength_workouts")
 
 
 # Pydantic Models (API)
