@@ -13,7 +13,19 @@ jobs:
 
       - name: Create archive of repository
         run: |
-          tar -czf deploy-package.tar.gz --exclude=".venv" --exclude=".database" --exclude=".git" --exclude=".github" .
+          # Add a delay to allow any background processes to settle
+          echo "Waiting for 5 seconds before creating archive..."
+          sleep 5
+          
+          # Create a list of files to exclude
+          echo ".venv" > .tarignore
+          echo ".database" >> .tarignore
+          echo ".git" >> .tarignore
+          echo ".github" >> .tarignore
+          
+          # Use the --ignore-failed-read flag to handle file changes during archiving
+          # and the -X flag to use the exclude file
+          tar -czf deploy-package.tar.gz --ignore-failed-read -X .tarignore .
 
       - name: Copy files to VPS
         uses: appleboy/scp-action@master
