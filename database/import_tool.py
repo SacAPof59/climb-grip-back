@@ -14,11 +14,11 @@ def extract_example_data_to_db():
     exemple_data_list = _load_exemple_data()
     db = SessionLocal()
     for exemple_data in exemple_data_list:
-        _export_to_db(db, exemple_data)
+        _import_to_db(db, exemple_data)
 
 
 def _load_exemple_data():
-    data_dir = "../data"
+    data_dir = "./example_data"
     if not os.path.exists(data_dir):
         raise HTTPException(status_code=404, detail=f"Data directory '{data_dir}' not found")
 
@@ -35,7 +35,7 @@ def _load_exemple_data():
 
     return exemple_data_list
 
-def _export_to_db(db, data):
+def _import_to_db(db, data):
     # Extract climber name
     filename = data.get("filename")
     personal_info = data.get("Personal", {})
@@ -45,11 +45,11 @@ def _export_to_db(db, data):
         climber_last_name = "None"
 
     # Find the climber
-    climber = db.query(models.Climber).filter_by(first_name=climber_first_name, last_name=climber_last_name).first()
+    climber = db.query(models.ClimberEntity).filter_by(first_name=climber_first_name, last_name=climber_last_name).first()
 
     if climber is None:
         # If the climber doesn't exist, create them
-        climber = models.Climber(
+        climber = models.ClimberEntity(
             first_name=climber_first_name,
             last_name=climber_last_name,
             age=personal_info.get("age", None),  # Extract from JSON or set to None
@@ -64,15 +64,15 @@ def _export_to_db(db, data):
     # Create a workout type if it doesn't exist
     measurement_info = data.get("Measurement", {})
     workout_type_name = measurement_info.get("workout", "Custom")
-    workout_type = db.query(models.WorkoutType).filter_by(name=workout_type_name).first()
+    workout_type = db.query(models.WorkoutTypeEntity).filter_by(name=workout_type_name).first()
     if workout_type is None:
-        workout_type = models.WorkoutType(
+        workout_type = models.WorkoutTypeEntity(
             name=workout_type_name,
             description=workout_type_name,  # Extract from JSON or set to a default
         )
         workout_type = crud.create_workout_type(db=db, workout_type=workout_type)
     # Create a workout associated with the climber
-    workout = models.Workout(
+    workout = models.WorkoutEntity(
         workout_name=workout_type.name,
         climber_id=climber.id,
         body_weight=measurement_info.get("weight", None),  # Extract from JSON or set to None
@@ -83,9 +83,9 @@ def _export_to_db(db, data):
     workout = crud.create_workout(db=db, workout=workout)
 
     # Create the measurement device
-    measurement_device = db.query(models.MeasurementDevice).first()
+    measurement_device = db.query(models.MeasurementDeviceEntity).first()
     if measurement_device is None:
-        measurement_device = models.MeasurementDevice(
+        measurement_device = models.MeasurementDeviceEntity(
             sample_rate_hz=10
         )
         measurement_device = crud.create_measurement_device(db=db, measurement_device=measurement_device)
@@ -94,7 +94,7 @@ def _export_to_db(db, data):
     #     # Create a critical force workout
     #     # Use the compute module to get the critical force and wPrime
     #     if not measurement_info.get("measDataKg"):
-    #         raise HTTPException(status_code=500, detail=f"'{filename}' does not have measured data")
+    #         raise HTTPException(status_code=500, detail=f"'{filename}' does not have measured example_data")
     #     sample_rate = measurement_device.sample_rate_hz
     #     repetition_duration = 1 / sample_rate
     #     lookup_table = np.zeros(len(measurement_info.get("measDataKg")))
@@ -112,9 +112,9 @@ def _export_to_db(db, data):
     #     )
     #     crud.create_critical_force_workout(db=db,critical_force_workout=critical_force_workout)
 
-    # Create measurements and associated data
+    # Create measurements and associated example_data
     for i, weight in enumerate(measurement_info.get("measDataKg", [])):
-        measurement = models.Measurement(
+        measurement = models.MeasurementEntity(
             workout_id=workout.id,
             measurement_device_id=measurement_device.id,
             current_repetition=1,
@@ -123,7 +123,7 @@ def _export_to_db(db, data):
             updated_at=func.now()
         )
         measurement = crud.create_measurement(db=db, measurement=measurement)
-        measured_data = models.MeasuredData(
+        measured_data = models.MeasuredDataEntity(
             measurement_id=measurement.id,
             iteration=i + 1,
             weight=weight
