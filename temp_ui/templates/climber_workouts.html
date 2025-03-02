@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climber Workouts</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Workouts for {{ climber.first_name }} {{ climber.last_name }}</h1>
+
+    {% if workouts %}
+    <ul>
+        {% for workout in workouts %}
+            <li>
+                <h2>Workout ID: {{ workout.id }} - Type: {{ workout.workout_name }}</h2>
+                <p>Body Weight: {{ workout.body_weight }} kg</p>
+                <p>Created at: {{ workout.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p>Updated at: {{ workout.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+
+                {% if workout.measurements %}
+                    <h3>Measurements</h3>
+                    {% for measurement in workout.measurements %}
+                      <div>
+                        <h4>Measurement ID: {{ measurement.id }}</h4>
+                        <p>Current Repetition: {{ measurement.current_repetition }}</p>
+                        <p>Created at: {{ measurement.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                        <p>Updated at: {{ measurement.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+
+                        {% if measurement.measured_data_for_graph %}
+                          <div>
+                            <h5>Measured Data</h5>
+                            <canvas id="chart-{{ measurement.id }}"></canvas>
+                            <script>
+                                const graphData{{ measurement.id }} = {{ measurement.measured_data_for_graph|tojson }};
+                                const ctx{{ measurement.id }} = document.getElementById('chart-{{ measurement.id }}').getContext('2d');
+
+                                const data{{ measurement.id }} = {
+                                  labels: graphData{{ measurement.id }}.map(item => item[0].toFixed(2)), // Time is the first element
+                                  datasets: [{
+                                    label: 'Weight (kg)',
+                                    data: graphData{{ measurement.id }}.map(item => item[1]), // Weight is the second element
+                                    borderColor: 'rgb(75, 192, 192)',
+                                    tension: 0.1
+                                  }]
+                                };
+
+                                new Chart(ctx{{ measurement.id }}, {
+                                  type: 'line',
+                                  data: data{{ measurement.id }},
+                                  options: {
+                                      responsive: true,
+                                      maintainAspectRatio: false,
+                                      scales: {
+                                          x: {
+                                              title: {
+                                                  display: true,
+                                                  text: 'Time (s)'
+                                              }
+                                          },
+                                          y: {
+                                              title: {
+                                                  display: true,
+                                                  text: 'Weight (kg)'
+                                              }
+                                          }
+                                      }
+                                  }
+                                });
+                            </script>
+                          </div>
+                        {% else %}
+                           <p>No data</p>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No measurements</p>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+      <p>No workout found.</p>
+    {% endif %}
+    <a href="/climbers">Go back to climbers</a>
+</body>
+</html>

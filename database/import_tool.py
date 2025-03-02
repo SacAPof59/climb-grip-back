@@ -35,6 +35,7 @@ def _load_exemple_data():
 
     return exemple_data_list
 
+
 def _import_to_db(db, data):
     # Extract climber name
     filename = data.get("filename")
@@ -90,39 +91,18 @@ def _import_to_db(db, data):
         )
         measurement_device = crud.create_measurement_device(db=db, measurement_device=measurement_device)
 
-    # if workout_type_name == "Critical Force Test":
-    #     # Create a critical force workout
-    #     # Use the compute module to get the critical force and wPrime
-    #     if not measurement_info.get("measDataKg"):
-    #         raise HTTPException(status_code=500, detail=f"'{filename}' does not have measured example_data")
-    #     sample_rate = measurement_device.sample_rate_hz
-    #     repetition_duration = 1 / sample_rate
-    #     lookup_table = np.zeros(len(measurement_info.get("measDataKg")))
-    #     for i in range(len(lookup_table)):
-    #         lookup_table[i] = 0
-    #     repetition_mean = criticalForce.computeRepetitionMean(measurement_info.get("measDataKg"), lookup_table,
-    #                                                           sample_rate)
-    #     cf, w_prime = criticalForce.computeCriticalForceAndWPrime(repetition_mean, repetition_duration)
-    #     max_force = criticalForce.computeMaxForce(repetition_mean)
-    #     critical_force_workout = models.CriticalForceWorkout(
-    #         workout_id=workout.id,
-    #         critical_force=cf,
-    #         w_prime=w_prime,
-    #         max_force=max_force
-    #     )
-    #     crud.create_critical_force_workout(db=db,critical_force_workout=critical_force_workout)
-
-    # Create measurements and associated example_data
+    # Create a single measurement
+    measurement = models.MeasurementEntity(
+        workout_id=workout.id,
+        measurement_device_id=measurement_device.id,
+        current_repetition=1,
+        created_at=datetime.strptime(measurement_info.get("timestamp"),
+                                     "%Y-%m-%d %H:%M:%S") if measurement_info.get("timestamp") else func.now(),
+        updated_at=func.now()
+    )
+    measurement = crud.create_measurement(db=db, measurement=measurement)
+    # Create measured data associated with this measurement
     for i, weight in enumerate(measurement_info.get("measDataKg", [])):
-        measurement = models.MeasurementEntity(
-            workout_id=workout.id,
-            measurement_device_id=measurement_device.id,
-            current_repetition=1,
-            created_at=datetime.strptime(measurement_info.get("timestamp"),
-                                         "%Y-%m-%d %H:%M:%S") if measurement_info.get("timestamp") else func.now(),
-            updated_at=func.now()
-        )
-        measurement = crud.create_measurement(db=db, measurement=measurement)
         measured_data = models.MeasuredDataEntity(
             measurement_id=measurement.id,
             iteration=i + 1,

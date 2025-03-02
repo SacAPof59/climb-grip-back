@@ -1,9 +1,10 @@
+# models.py - Fixed version
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, joinedload
 from database.database import Base
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 
 
 # SQLAlchemy Models (Database)
@@ -104,6 +105,21 @@ class MaxIsoStrengthWorkoutEntity(Base):
 
 
 # Pydantic Models (API)
+class MeasurementDeviceBase(BaseModel):
+    sample_rate_hz: int
+    id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MeasuredDataBase(BaseModel):
+    measurement_id: int
+    iteration: int
+    weight: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ClimberBase(BaseModel):
     first_name: str
     last_name: str
@@ -113,22 +129,13 @@ class ClimberBase(BaseModel):
     span: float
     route_grade: str
     boulder_grade: str
-    id : Optional[int] = None
+    id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ClimberCreate(ClimberBase):
     pass
-
-
-class MeasurementDeviceBase(BaseModel):
-    sample_rate_hz: int
-    id : Optional[int] = None
-
-    class Config:
-        from_attributes = True
 
 
 class MeasurementDeviceCreate(MeasurementDeviceBase):
@@ -144,12 +151,33 @@ class WorkoutTypeBase(BaseModel):
     repetition_active: int
     repetition_pause: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkoutTypeCreate(WorkoutTypeBase):
     pass
+
+
+# Simplified measurement model for API responses
+class MeasurementResponse(BaseModel):
+    id: int
+    workout_id: int
+    measurement_device_id: int
+    current_repetition: int
+    created_at: datetime
+    updated_at: datetime
+    measurement_device: Optional[MeasurementDeviceBase] = None
+    measured_data_for_graph: Optional[List[Tuple[float, float]]] = None #add this
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MeasurementCreate(BaseModel):
+    workout_id: int
+    measurement_device_id: int
+    current_repetition: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class WorkoutBase(BaseModel):
@@ -158,39 +186,20 @@ class WorkoutBase(BaseModel):
     body_weight: float
     created_at: datetime
     updated_at: datetime
-    id : Optional[int] = None
+    id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkoutCreate(WorkoutBase):
     pass
 
 
-class MeasurementBase(BaseModel):
-    workout_id: int
-    measurement_device_id: int
-    current_repetition: int
-    created_at: datetime
-    updated_at: datetime
-    id : Optional[int] = None
+class WorkoutRead(WorkoutBase):
+    id: int
+    measurements: Optional[List[MeasurementResponse]] = None
 
-    class Config:
-        from_attributes = True
-
-
-class MeasurementCreate(MeasurementBase):
-    pass
-
-
-class MeasuredDataBase(BaseModel):
-    measurement_id: int
-    iteration: int
-    weight: float
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeasuredDataCreate(MeasuredDataBase):
@@ -203,8 +212,7 @@ class CriticalForceWorkoutBase(BaseModel):
     max_force: float
     workout_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CriticalForceWorkoutCreate(CriticalForceWorkoutBase):
@@ -215,8 +223,7 @@ class MaxIsoStrengthWorkoutBase(BaseModel):
     max_force: float
     workout_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MaxIsoStrengthWorkoutCreate(MaxIsoStrengthWorkoutBase):

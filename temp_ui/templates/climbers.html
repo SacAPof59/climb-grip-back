@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,9 @@
     <h1>Climbers</h1>
     <ul>
         {% for climber in climbers %}
-            <li>{{ climber.first_name }} {{ climber.last_name }} - Age: {{ climber.age }}</li>
+            <li>
+              <a href="/climber/{{ climber.id }}/workouts">{{ climber.first_name }} {{ climber.last_name }} - Age: {{ climber.age }}</a>
+            </li>
         {% endfor %}
     </ul>
     <a href="/">Go back to main</a>
