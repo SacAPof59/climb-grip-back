@@ -17,7 +17,7 @@ templates = Jinja2Templates(directory="temp_ui/templates")
 # Web routes (using Jinja2)
 @ui.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "message": "Hello from Jinja2!"})
+    return templates.TemplateResponse("index.html", {"request": request, "message": "Hello SacAPof59!"})
 
 
 @ui.get("/climbers", response_class=HTMLResponse)
