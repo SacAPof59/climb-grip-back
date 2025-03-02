@@ -49,8 +49,8 @@ jobs:
             tar -xzf deploy-package.tar.gz -C /var/www/climb-grip-back
             source .venv/bin/activate
             pip install -r requirements.txt
-            # Stop Gunicorn (if it's running)
-            pgrep gunicorn | xargs kill -9 || true
-            # Start Gunicorn
-            gunicorn main:app --workers 3 --bind unix:climb-grip-back.sock --timeout 120 --worker-class uvicorn.workers.UvicornWorker --umask 007
+            #Restart the service
+            sudo systemctl daemon-reload
+            sudo systemctl restart climb-grip-back
+            #restart nginx
             sudo systemctl restart nginx
