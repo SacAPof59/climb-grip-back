@@ -1,16 +1,24 @@
 # temp_ui/temp_ui.py
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from database.database import SessionLocal
 from models import models
 from typing import List, Tuple
 from sqlalchemy.orm import joinedload
+import asyncio
+import json
+import time
 
 ui = FastAPI()
 
 # Configure Jinja2 templates
 templates = Jinja2Templates(directory="temp_ui/templates")
+
+# Bluetooth simulation variables
+python_connection_active = False
+python_weight_data = 0.0
+
 
 # Web routes (using Jinja2)
 @ui.get("/", response_class=HTMLResponse)
@@ -79,7 +87,7 @@ async def climber_workouts(request: Request, climber_id: int):
                     "id": measurement.measurement_device.id,
                     "sample_rate_hz": measurement.measurement_device.sample_rate_hz
                 } if measurement.measurement_device else None,
-                "measured_data_for_graph" : [], # Add this line
+                "measured_data_for_graph": [],  # Add this line
             }
 
             measurement_model = models.MeasurementResponse.model_validate(measurement_dict)
@@ -110,3 +118,47 @@ async def climber_workouts(request: Request, climber_id: int):
         "climber_workouts.html",
         {"request": request, "climber": climber_model, "workouts": workout_models},
     )
+
+
+@ui.get("/bluetooth_test", response_class=HTMLResponse)
+async def bluetooth_test_page(request: Request):
+    return templates.TemplateResponse("bluetooth_test.html", {"request": request})
+
+
+async def bluetooth_simulation_data_stream():
+    global python_connection_active
+    global python_weight_data
+    try:
+        while python_connection_active:
+            python_weight_data += (0.5 - (time.time() % 1)) / 2
+            if python_weight_data < 0:
+                python_weight_data = 0.0
+            if python_weight_data > 100:
+                python_weight_data = 100
+            data = {"weight": python_weight_data}
+            yield json.dumps(data) + "\n"
+            await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
+        print("Bluetooth simulation cancelled")
+        python_connection_active = False
+    print("Bluetooth simulation ended")
+
+
+@ui.get("/start_bluetooth_python")
+async def start_bluetooth_python():
+    global python_connection_active
+    if not python_connection_active:
+        python_connection_active = True
+        return StreamingResponse(bluetooth_simulation_data_stream(), media_type="text/event-stream")
+    else:
+        raise HTTPException(status_code=409, detail="Bluetooth connection already active")
+
+
+@ui.post("/stop_bluetooth_python")
+async def stop_bluetooth_python():
+    global python_connection_active
+    if python_connection_active:
+        python_connection_active = False
+        return Response(status_code=200)
+    else:
+        raise HTTPException(status_code=409, detail="Bluetooth connection not active")
