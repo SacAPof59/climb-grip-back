@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bluetooth Test</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -17,24 +17,23 @@
     <p>Weight: <span id="weightValue">--</span></p>
     <p>Battery: <span id="batteryLevel">--</span></p>
     <button id="connect">Connect to ForceGrip</button>
-    <canvas id="weightChart"></canvas>
     <button id="disconnect-js">Shutdown JS Connection</button>
-</section>
-
-<section>
-    <h2>Jinja2/Python Connection</h2>
-    <p>Status: <span id="python-status">Disconnected</span></p>
-    <button id="connect-python">Start Python Connection</button>
-    <p id="python-data">Data: --</p>
-    <button id="disconnect-python">Shutdown Python Connection</button>
-
-    <canvas id="python-chart"></canvas>
-
+    <div>
+        <canvas id="weightChart"></canvas>
+    </div>
 </section>
 
 <script>
     // JavaScript-only connection
     let weightData = [];
+    let lastWeight = 0;
+    let isWorkoutRunning = false;
+    let workoutId = null;
+    let climberId = 1;
+    const measurementInterval = 1000;  // 1 second
+    let lastMeasurementTime = Date.now();
+    let workoutIntervalId;
+
     let timeLabels = [];
     let chart;
     let BLE_Device = 0;
@@ -42,6 +41,12 @@
     let timePythonLabels = [];
     let pythonChart;
     let pythonConnected = false;
+
+    const headers = {
+        'Content-Type': 'application/json',
+    }
+
+
 
     // Initialize Chart.js graph
     function initGraph() {
@@ -55,7 +60,12 @@
                     data: weightData,
                     borderColor: 'rgba(75, 192, 192, 1)',
                     borderWidth: 2,
-                    fill: false
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 2,
+                    pointHitRadius: 10,
+                    pointHoverRadius: 5,
+                    pointHoverBorderWidth: 2,
                 }]
             },
             options: {
@@ -68,35 +78,13 @@
                         title: { display: true, text: 'Weight (kg)' },
                         beginAtZero: true
                     }
-                }
-            }
-        });
-    }
-    function initPythonGraph() {
-        const ctx = document.getElementById('python-chart').getContext('2d');
-        pythonChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: timePythonLabels,
-                datasets: [{
-                    label: 'Weight (kg)',
-                    data: weightPythonData,
-                    borderColor: 'rgba(255, 0, 0, 1)',
-                    borderWidth: 2,
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        title: { display: true, text: 'Time (s)' }
-                    },
-                    y: {
-                        title: { display: true, text: 'Weight (kg)' },
-                        beginAtZero: true
-                    }
-                }
+                },
+                animation: {
+                    duration: 0,
+                },
+                hover: {
+                    animationDuration: 0,
+                },
             }
         });
     }
@@ -121,8 +109,9 @@
             console.log('Subscribing to weight notifications...');
             weightCharacteristic.addEventListener('characteristicvaluechanged', event => {
                 const value = event.target.value;
-                const weight = value.getUint16(1, true) / 200; // Implement parse logic based on your device
+                const weight = value.getUint16(1, true) / 200;
                 const targetWeight = document.getElementById('targetWeight').value;
+                lastWeight = weight;
 
                 //console.log('Weight:', weight);
                 document.getElementById('weightValue').innerText = weight.toLocaleString(undefined, { minimumFractionDigits: 1 , maximumFractionDigits:1}) + " kg";
@@ -166,6 +155,62 @@
         }
     }
 
+    async function startWorkout() {
+        try {
+            const response = await fetch(`/climber/${climberId}/start_workout`, {
+                method: 'POST',
+                headers
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            workoutId = data.workout_id;
+            console.log("Started workout with ID:", workoutId);
+            isWorkoutRunning = true;
+        } catch (error) {
+            console.error("Failed to start workout:", error);
+        }
+    }
+
+    async function addMeasurement(workoutId, weight) {
+        try {
+            if(workoutId)
+            {
+                const response = await fetch(`/workout/${workoutId}/add_measurement?weight=${weight}`, {
+                    method: 'POST',
+                    headers
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+            }
+        } catch (error) {
+            console.error("Failed to add measurement:", error);
+        }
+    }
+
+    document.getElementById('startWorkout').addEventListener('click', async () => {
+        if (!isWorkoutRunning) {
+            await startWorkout();
+            workoutIntervalId = setInterval(() => {
+                    const currentTime = Date.now();
+
+                    if(lastMeasurementTime <= currentTime-measurementInterval)
+                    {
+                        addMeasurement(workoutId, lastWeight);
+                        lastMeasurementTime = Date.now()
+                    }
+                }, measurementInterval);
+            document.getElementById('startWorkout').textContent = 'Stop Workout';
+        } else {
+            isWorkoutRunning = false;
+            clearInterval(workoutIntervalId);
+            document.getElementById('startWorkout').textContent = 'Start Workout';
+        }
+    });
+
     // Event listener for connect button
     document.getElementById('connect').addEventListener('click', () => {
         if((BLE_Device == 0) || (!BLE_Device.gatt.connected))
@@ -190,6 +235,7 @@
         }
         weightData = [];
         timeLabels = [];
+        chart.data.labels = timeLabels;
         chart.update();
         document.getElementById('connect').innerText = "Connect to ForceGrip";
     });
@@ -197,86 +243,7 @@
     // Initialize graph on page load
     window.onload = function () {
         initGraph();
-        initPythonGraph();
     };
-
-    // Jinja2/Python connection
-    document.getElementById('connect-python').addEventListener('click', () => {
-        if (!pythonConnected) {
-            fetch('/start_bluetooth_python')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    pythonConnected = true;
-                    document.getElementById('connect-python').textContent = "Disconnect from Python";
-                    return response.body.getReader();
-                })
-                .then(reader => {
-                    function read() {
-                        reader.read().then(({ done, value }) => {
-                            if (done) {
-                                console.log('Stream complete');
-                                pythonConnected = false;
-                                document.getElementById('connect-python').textContent = "Start Python Connection";
-                                document.getElementById('python-status').textContent = "Disconnected";
-                                document.getElementById('python-status').style.color = "red";
-                                return;
-                            }
-                            const decoder = new TextDecoder();
-                            const data = decoder.decode(value);
-                            // Process the data (e.g., parse JSON)
-                            try {
-                                const parsedData = JSON.parse(data);
-                                if (parsedData.weight !== undefined) {
-                                    document.getElementById('python-data').textContent = `Data: ${parsedData.weight.toFixed(1)} kg`;
-                                    document.getElementById('python-status').textContent = "Connected";
-                                    document.getElementById('python-status').style.color = "green";
-                                    weightPythonData.push(parsedData.weight);
-                                     if (weightPythonData.length > 60) {
-                                        weightPythonData.shift();
-                                        timePythonLabels.shift();
-                                     }
-                                    timePythonLabels.push(new Date().toLocaleTimeString());
-                                    pythonChart.update();
-                                }
-                            } catch (error) {
-                                console.error('Error parsing JSON:', error);
-                            }
-                            read();
-                        });
-                    }
-                    read();
-                })
-                .catch(error => {
-                    console.error('There has been a problem with your fetch operation:', error);
-                });
-        } else {
-             fetch('/stop_bluetooth_python', { method: 'POST' })
-            .then(response => {
-                pythonConnected = false;
-            })
-            .catch(error => {
-                console.error("Error stopping bluetooth:", error);
-            });
-             document.getElementById('connect-python').textContent = "Start Python Connection";
-        }
-    });
-
-    document.getElementById('disconnect-python').addEventListener('click', () => {
-        if(pythonConnected)
-        {
-            fetch('/stop_bluetooth_python', { method: 'POST' })
-            .then(response => {
-                pythonConnected = false;
-            })
-            .catch(error => {
-                console.error("Error stopping bluetooth:", error);
-            });
-        }
-         document.getElementById('connect-python').textContent = "Start Python Connection";
-    });
-
 </script>
 </body>
 </html>
