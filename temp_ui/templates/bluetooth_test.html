@@ -17,16 +17,20 @@
     <p>Weight: <span id="weightValue">--</span></p>
     <p>Battery: <span id="batteryLevel">--</span></p>
     <button id="connect">Connect to ForceGrip</button>
+    <button id="startWorkout">Start Workout</button>
     <button id="disconnect-js">Shutdown JS Connection</button>
     <div>
         <canvas id="weightChart"></canvas>
     </div>
 </section>
-
+<div>
+    <a href="/">Go back to main</a>
+</div>
 <script>
     // JavaScript-only connection
     let weightData = [];
     let lastWeight = 0;
+    let batteryLevel = 0;
     let isWorkoutRunning = false;
     let workoutId = null;
     let climberId = 1;
@@ -37,10 +41,6 @@
     let timeLabels = [];
     let chart;
     let BLE_Device = 0;
-    let weightPythonData = [];
-    let timePythonLabels = [];
-    let pythonChart;
-    let pythonConnected = false;
 
     const headers = {
         'Content-Type': 'application/json',
@@ -142,6 +142,7 @@
             batteryCharacteristic.addEventListener('characteristicvaluechanged', event => {
                 const value = event.target.value;
                 const batteryLevel = value.getUint8(0);
+                batteryLevel = batteryLevel;
 
                 document.getElementById('batteryLevel').innerText = batteryLevel + " %";
             });
@@ -173,13 +174,14 @@
         }
     }
 
-    async function addMeasurement(workoutId, weight) {
+    async function addMeasurement(workoutId, weight, battery) {
         try {
             if(workoutId)
             {
-                const response = await fetch(`/workout/${workoutId}/add_measurement?weight=${weight}`, {
+                const response = await fetch(`/workout/${workoutId}/add_measurement`, {
                     method: 'POST',
-                    headers
+                    headers,
+                    body : JSON.stringify({weight: weight, battery: battery}),
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -199,7 +201,7 @@
 
                     if(lastMeasurementTime <= currentTime-measurementInterval)
                     {
-                        addMeasurement(workoutId, lastWeight);
+                        addMeasurement(workoutId, lastWeight, batteryLevel);
                         lastMeasurementTime = Date.now()
                     }
                 }, measurementInterval);

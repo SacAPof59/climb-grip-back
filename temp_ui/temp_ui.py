@@ -1,15 +1,12 @@
 # temp_ui/temp_ui.py
 from fastapi import FastAPI, Request, HTTPException, Response, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from database.database import SessionLocal, get_db
 from models import models
 from typing import List, Tuple
 from sqlalchemy.orm import joinedload, Session
 from sqlalchemy import func
-import asyncio
-import json
-import time
 from datetime import datetime
 
 ui = FastAPI()
@@ -17,27 +14,26 @@ ui = FastAPI()
 # Configure Jinja2 templates
 templates = Jinja2Templates(directory="temp_ui/templates")
 
-# Bluetooth simulation variables
-python_connection_active = False
-python_weight_data = 0.0
 
-# Dependency to get the database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def get_or_create_basic_workout_type(db: Session):
-    """Get the 'basic' workout type, or create it if it doesn't exist."""
-    workout_type = db.query(models.WorkoutTypeEntity).filter_by(name="basic").first()
-    if not workout_type:
-        workout_type = models.WorkoutTypeEntity(name="basic", description="Basic workout", sets_number=1, set_pause=0, repetitions=1, repetition_active=0, repetition_pause=0)
-        db.add(workout_type)
+# Helper functions
+def get_or_create_basic_workout_type(db: Session) -> models.WorkoutTypeEntity:
+    """Retrieve or create the basic workout type."""
+    basic_workout_type = db.query(models.WorkoutTypeEntity).filter_by(name="basic").first()
+    if not basic_workout_type:
+        basic_workout_type = models.WorkoutTypeEntity(
+            name="basic",
+            description="Basic workout type",
+            sets_number=1,
+            set_pause=0,
+            repetitions=1,
+            repetition_active=0,
+            repetition_pause=0,
+        )
+        db.add(basic_workout_type)
         db.commit()
-        db.refresh(workout_type)
-    return workout_type
+        db.refresh(basic_workout_type)
+    return basic_workout_type
+
 
 # Web routes (using Jinja2)
 @ui.get("/", response_class=HTMLResponse)
@@ -54,6 +50,7 @@ async def list_climbers(request: Request):
     ]
 
     return templates.TemplateResponse("climbers.html", {"request": request, "climbers": climber_models})
+
 
 @ui.post("/climber/{climber_id}/start_workout")
 async def start_workout(request: Request, climber_id: int, db: Session = Depends(get_db)):
@@ -77,10 +74,12 @@ async def start_workout(request: Request, climber_id: int, db: Session = Depends
     db.commit()
     db.refresh(new_workout)
 
-    return JSONResponse({"workout_id": new_workout.id, "message": f"Workout created for climber {climber_id}"}, status_code=201)
+    return JSONResponse({"workout_id": new_workout.id, "message": f"Workout created for climber {climber_id}"},
+                        status_code=201)
+
 
 @ui.post("/workout/{workout_id}/add_measurement")
-async def add_measurement(workout_id: int, weight: float, db: Session = Depends(get_db)):
+async def add_measurement(workout_id: int, request: Request, db: Session = Depends(get_db)):
     """Add a new measurement to a workout."""
     workout = db.query(models.WorkoutEntity).filter(models.WorkoutEntity.id == workout_id).first()
     if not workout:
@@ -90,14 +89,24 @@ async def add_measurement(workout_id: int, weight: float, db: Session = Depends(
     if not measurement_device:
         raise HTTPException(status_code=404, detail="Measurement Device not found")
 
-    current_measurement_id = (db.query(func.max(models.MeasurementEntity.id)).scalar() or 0)+1
-    new_measurement = models.MeasurementEntity(id=current_measurement_id, workout_id=workout_id, measurement_device_id=measurement_device.id, current_repetition=0, created_at=datetime.now(), updated_at=datetime.now())
+    data = await request.json()
+    weight = data.get("weight")
+    battery = data.get("battery")
+
+    if weight is None or battery is None:
+        raise HTTPException(status_code=400, detail="Weight or battery data is missing")
+
+    current_measurement_id = (db.query(func.max(models.MeasurementEntity.id)).scalar() or 0) + 1
+    new_measurement = models.MeasurementEntity(id=current_measurement_id, workout_id=workout_id,
+                                               measurement_device_id=measurement_device.id, current_repetition=0,
+                                               created_at=datetime.now(), updated_at=datetime.now())
     db.add(new_measurement)
 
     new_measured_data = models.MeasuredDataEntity(measurement_id=current_measurement_id, iteration=0, weight=weight)
     db.add(new_measured_data)
     db.commit()
     return JSONResponse({"message": "Measurement added to workout"}, status_code=201)
+
 
 @ui.get("/climber/{climber_id}/workouts", response_class=HTMLResponse)
 async def climber_workouts(request: Request, climber_id: int):
@@ -173,8 +182,8 @@ async def climber_workouts(request: Request, climber_id: int):
 
         workout_models.append(workout_model)
 
-    # Close the session
-    db.close()
+        # Close the session
+        db.close()
 
     return templates.TemplateResponse(
         "climber_workouts.html",
@@ -185,4 +194,3 @@ async def climber_workouts(request: Request, climber_id: int):
 @ui.get("/bluetooth_test", response_class=HTMLResponse)
 async def bluetooth_test_page(request: Request):
     return templates.TemplateResponse("bluetooth_test.html", {"request": request})
-
